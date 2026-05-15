@@ -667,52 +667,16 @@ fun PlayerScreen(
                 .zIndex(2.7f)
         )
 
-        // Buffering indicator
-        if (uiState.isBuffering && !uiState.showLoadingOverlay) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                if (uiState.isTorrentStream && uiState.torrentBufferingMessage != null) {
-                    // Torrent rebuffer: spinner + download stats + progress bar
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        LoadingIndicator()
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = uiState.torrentBufferingMessage ?: "",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                        if (uiState.torrentBufferingProgress > 0f) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .width(200.dp)
-                                    .height(3.dp)
-                                    .background(
-                                        color = Color.White.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(2.dp)
-                                    )
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth(uiState.torrentBufferingProgress.coerceIn(0f, 1f))
-                                        .height(3.dp)
-                                        .background(
-                                            color = Color.White.copy(alpha = 0.85f),
-                                            shape = RoundedCornerShape(2.dp)
-                                        )
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    LoadingIndicator()
-                }
-            }
-        }
+        // Buffering indicator — isolated in its own composable scope so that
+        // isBuffering state changes only recompose this small subtree instead
+        // of the entire PlayerScreen.
+        PlayerBufferingIndicator(
+            isBuffering = uiState.isBuffering,
+            showLoadingOverlay = uiState.showLoadingOverlay,
+            isTorrentStream = uiState.isTorrentStream,
+            torrentBufferingMessage = uiState.torrentBufferingMessage,
+            torrentBufferingProgress = uiState.torrentBufferingProgress
+        )
 
         // Error state
         if (uiState.error != null) {
@@ -2677,4 +2641,64 @@ private fun formatTime(millis: Long): String {
 
 private fun formatSubtitleDelay(delayMs: Int): String {
     return String.format(Locale.US, "%+.3fs", delayMs / 1000f)
+}
+
+/**
+ * Buffering indicator extracted into its own composable to isolate
+ * recomposition scope. When [isBuffering] toggles, only this subtree
+ * is recomposed — the rest of [PlayerScreen] is skipped by Compose.
+ */
+@Composable
+private fun PlayerBufferingIndicator(
+    isBuffering: Boolean,
+    showLoadingOverlay: Boolean,
+    isTorrentStream: Boolean,
+    torrentBufferingMessage: String?,
+    torrentBufferingProgress: Float
+) {
+    if (!isBuffering || showLoadingOverlay) return
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isTorrentStream && torrentBufferingMessage != null) {
+            // Torrent rebuffer: spinner + download stats + progress bar
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                LoadingIndicator()
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = torrentBufferingMessage,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+                if (torrentBufferingProgress > 0f) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(200.dp)
+                            .height(3.dp)
+                            .background(
+                                color = Color.White.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(2.dp)
+                            )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(torrentBufferingProgress.coerceIn(0f, 1f))
+                                .height(3.dp)
+                                .background(
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    shape = RoundedCornerShape(2.dp)
+                                )
+                        )
+                    }
+                }
+            }
+        } else {
+            LoadingIndicator()
+        }
+    }
 }

@@ -235,10 +235,10 @@ internal fun PlayerRuntimeController.saveWatchProgressIfNeeded() {
     if (!hasRenderedFirstFrame) return
     val currentPosition = currentPlaybackPositionMs() ?: return
     val duration = getEffectiveDuration(currentPosition)
-    // Don't save progress for very short streams (< 1 minute) — these are
+    // Don't save progress for very short streams (< 2:01) — these are
     // typically error/warning messages or "stream not ready" placeholders that
     // would incorrectly mark content as watched when the user exits.
-    if (duration in 1..59999) return
+    if (isShortPlaceholderDuration(duration)) return
 
     if (kotlin.math.abs(currentPosition - lastSavedPosition) >= saveThresholdMs) {
         lastSavedPosition = currentPosition
@@ -250,7 +250,7 @@ internal fun PlayerRuntimeController.saveWatchProgress() {
     if (!hasRenderedFirstFrame) return
     val currentPosition = currentPlaybackPositionMs() ?: return
     val duration = getEffectiveDuration(currentPosition)
-    if (duration in 1..59999) return
+    if (isShortPlaceholderDuration(duration)) return
     saveWatchProgressInternal(currentPosition, duration)
 }
 
@@ -267,6 +267,13 @@ internal fun PlayerRuntimeController.getEffectiveDuration(position: Long): Long 
     if (!isEnded && effectiveDuration < position) return 0L
 
     return effectiveDuration
+}
+
+private fun isShortPlaceholderDuration(duration: Long) = duration in 1..120999
+
+private fun PlayerRuntimeController.isShortPlaceholderStream(): Boolean {
+    val position = currentPlaybackPositionMs() ?: return false
+    return isShortPlaceholderDuration(getEffectiveDuration(position))
 }
 
 internal fun PlayerRuntimeController.saveWatchProgressInternal(position: Long, duration: Long, syncRemote: Boolean = true) {
@@ -352,6 +359,7 @@ internal fun PlayerRuntimeController.buildScrobbleItem(): TraktScrobbleItem? {
 }
 
 internal fun PlayerRuntimeController.emitScrobbleStart() {
+    if (isShortPlaceholderStream()) return
     val item = currentScrobbleItem ?: buildScrobbleItem().also { currentScrobbleItem = it }
     if (item == null) return
     if (hasRequestedScrobbleStartForCurrentItem) return
@@ -370,6 +378,7 @@ internal fun PlayerRuntimeController.emitScrobbleStart() {
 }
 
 internal fun PlayerRuntimeController.emitScrobbleStop(progressPercent: Float? = null) {
+    if (isShortPlaceholderStream()) return
     val item = currentScrobbleItem
     if (item == null) return
 
@@ -390,6 +399,7 @@ internal fun PlayerRuntimeController.emitScrobbleStop(progressPercent: Float? = 
 
 internal fun PlayerRuntimeController.emitPauseScrobbleStop(progressPercent: Float) {
     if (progressPercent < 1f || progressPercent >= 80f) return
+    if (isShortPlaceholderStream()) return
     val item = currentScrobbleItem
     if (item == null) return
     if (!hasRequestedScrobbleStartForCurrentItem) return
