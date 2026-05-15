@@ -10,12 +10,15 @@ import com.nuvio.tv.core.profile.ProfileManager
 import com.nuvio.tv.core.qr.QrCodeGenerator
 import com.nuvio.tv.core.server.DeviceIpAddress
 import com.nuvio.tv.core.server.RepositoryConfigServer
+import com.nuvio.tv.data.local.PluginDataStore
+import com.nuvio.tv.domain.model.PluginRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -25,6 +28,7 @@ import javax.inject.Inject
 class PluginViewModel @Inject constructor(
     private val pluginManager: PluginManager,
     private val profileManager: ProfileManager,
+    private val dataStore: PluginDataStore,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -94,6 +98,9 @@ class PluginViewModel @Inject constructor(
             is PluginUiEvent.TestScraper -> testScraper(event.scraperId)
             is PluginUiEvent.SetPluginsEnabled -> setPluginsEnabled(event.enabled)
             is PluginUiEvent.SetGroupStreamsByRepository -> setGroupStreamsByRepository(event.enabled)
+            is PluginUiEvent.OpenRepoConfig -> openRepoConfig(event.repo)
+            PluginUiEvent.DismissRepoConfig -> _uiState.update {it.copy(configuringRepo = null, configuringRepoCurrentValues = emptyMap())}
+            is PluginUiEvent.SaveRepoConfig -> saveRepoConfig(event.repoId, event.values)
             PluginUiEvent.ClearTestResults -> _uiState.update { it.copy(testResults = null, testDiagnostics = null, testScraperId = null) }
             PluginUiEvent.ClearError -> _uiState.update { it.copy(errorMessage = null) }
             PluginUiEvent.ClearSuccess -> _uiState.update { it.copy(successMessage = null) }
@@ -395,6 +402,50 @@ class PluginViewModel @Inject constructor(
         val pending = _uiState.value.pendingRepoChange ?: return
         repoServer?.rejectChange(pending.changeId)
         _uiState.update { it.copy(pendingRepoChange = null) }
+    }
+
+    private fun openRepoConfig(repo: PluginRepository) {
+        viewModelScope.launch {
+            val scraperIds = pluginManager.scrapers
+                .first()
+                .filter { scraper -> scraper.repositoryId == repo.id }
+                .map { scraper -> scraper.id }
+
+            val currentValues = if (scraperIds.isNotEmpty()) {
+                dataStore.getScraperSettings(scraperIds.first())
+                    .mapValues { entry -> entry.value.toString() }
+            } else {
+                emptyMap()
+            }
+
+            _uiState.update {
+                it.copy(
+                    configuringRepo = repo,
+                    configuringRepoCurrentValues = currentValues,
+                )
+            }
+        }
+    }
+
+    private fun saveRepoConfig(repoId: String, values: Map<String, String>) {
+        viewModelScope.launch {
+            val scraperIds = pluginManager.scrapers
+                .first()
+                .filter { scraper -> scraper.repositoryId == repoId }
+                .map { scraper -> scraper.id }
+
+            scraperIds.forEach { scraperId ->
+                dataStore.setScraperSettings(scraperId, values)
+            }
+
+            _uiState.update {
+                it.copy(
+                    configuringRepo = null,
+                    configuringRepoCurrentValues = emptyMap(),
+                    successMessage = context.getString(R.string.plugin_config_saved),
+                )
+            }
+        }
     }
 
     override fun onCleared() {

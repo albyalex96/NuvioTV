@@ -26,7 +26,10 @@ data class PluginUiState(
     // Pending change from phone
     val pendingRepoChange: PendingRepoChangeInfo? = null,
     // Pending scraper enable confirmation
-    val pendingScraperEnable: PendingScraperEnableInfo? = null
+    val pendingScraperEnable: PendingScraperEnableInfo? = null,
+    // Config dialog
+    val configuringRepo: PluginRepository? = null,
+    val configuringRepoCurrentValues: Map<String, String> = emptyMap(),
 )
 
 data class PendingRepoChangeInfo(
@@ -60,4 +63,7 @@ sealed interface PluginUiEvent {
     object RejectPendingRepoChange : PluginUiEvent
     object ConfirmPendingScraperEnable : PluginUiEvent
     object DismissPendingScraperEnable : PluginUiEvent
+    data class OpenRepoConfig(val repo: PluginRepository) : PluginUiEvent
+    object DismissRepoConfig : PluginUiEvent
+    data class SaveRepoConfig(val repoId: String, val values: Map<String, String>) : PluginUiEvent
 }

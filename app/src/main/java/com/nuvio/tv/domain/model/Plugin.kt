@@ -29,7 +29,19 @@ data class PluginRepository(
     val enabled: Boolean = true,
     val lastUpdated: Long = 0L,
     val scraperCount: Int = 0,
+    val settings: List<PluginConfigField> = emptyList(),
     val type: RepositoryType = RepositoryType.NUVIO_JS
+)
+/**
+ * Represents scraper setting 
+ */
+@JsonClass(generateAdapter = true)
+data class PluginConfigField(
+    val key: String,
+    val label: String,
+    val description: String? = null,
+    val type: String = "text",
+    val required: Boolean = false,
 )
 
 /**
@@ -41,6 +53,7 @@ data class PluginManifest(
     val version: String,
     val description: String? = null,
     val author: String? = null,
+    val settings: List<PluginConfigField> = emptyList(),
     val scrapers: List<ScraperManifestInfo>
 )
 

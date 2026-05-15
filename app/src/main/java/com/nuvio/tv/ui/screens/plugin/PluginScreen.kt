@@ -1,7 +1,11 @@
 @file:OptIn(ExperimentalTvMaterial3Api::class)
 
 package com.nuvio.tv.ui.screens.plugin
-
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.runtime.mutableStateMapOf
+import com.nuvio.tv.domain.model.PluginConfigField
+import androidx.compose.foundation.layout.wrapContentHeight
+import com.nuvio.tv.ui.screens.account.InputField
 import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -234,6 +238,7 @@ fun PluginScreenContent(
                     repoScrapers = repoScrapers,
                     onRefresh = { viewModel.onEvent(PluginUiEvent.RefreshRepository(repo.id)) },
                     onRemove = { viewModel.onEvent(PluginUiEvent.RemoveRepository(repo.id)) },
+                    onConfigure = { viewModel.onEvent(PluginUiEvent.OpenRepoConfig(repo)) },
                     onToggleAll = { enabled ->
                         viewModel.onEvent(PluginUiEvent.ToggleAllScrapersForRepo(repo.id, enabled))
                     },
@@ -295,6 +300,20 @@ fun PluginScreenContent(
                     pendingChange = pending,
                     onConfirm = { viewModel.onEvent(PluginUiEvent.ConfirmPendingRepoChange) },
                     onReject = { viewModel.onEvent(PluginUiEvent.RejectPendingRepoChange) }
+                )
+            }
+        }
+    }
+    if (uiState.configuringRepo != null) {
+        Popup(properties = PopupProperties(focusable = true)) {
+            uiState.configuringRepo?.let { repo ->
+                RepoConfigDialog(
+                    repo = repo,
+                    initialValues = uiState.configuringRepoCurrentValues,
+                    onDismiss = { viewModel.onEvent(PluginUiEvent.DismissRepoConfig) },
+                    onSave = { values ->
+                        viewModel.onEvent(PluginUiEvent.SaveRepoConfig(repo.id, values))
+                    }
                 )
             }
         }
@@ -1045,13 +1064,172 @@ private fun ConfirmScraperEnableDialog(
         }
     }
 }
+@Composable
+private fun RepoConfigDialog(
+    repo: PluginRepository,
+    initialValues: Map<String, String>,
+    onDismiss: () -> Unit,
+    onSave: (Map<String, String>) -> Unit
+) {
+    val focusRequester = remember { FocusRequester() }
+    val scrollState = rememberScrollState()
+    val fieldValues = remember(repo.id) {
+        mutableStateMapOf<String, String>().apply {
+            repo.settings.forEach { field ->
+                put(field.key, initialValues[field.key] ?: "")
+            }
+        }
+    }
 
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    BackHandler { onDismiss() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.8f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            onClick = { },
+            modifier = Modifier
+                .width(560.dp)
+                .wrapContentHeight()
+                .heightIn(max = 640.dp),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = NuvioColors.SurfaceVariant
+            ),
+            shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(16.dp))
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                ) {
+                Text(
+                    text = "${repo.name} — Settings",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = NuvioColors.TextPrimary
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .background(
+                            color = NuvioColors.Surface,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                            .verticalScroll(scrollState),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        repo.settings.forEach { field ->
+                            Column {
+                                Text(
+                                    text = field.label,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = NuvioColors.TextPrimary
+                                )
+                                field.description?.let { desc ->
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = desc,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = NuvioColors.TextSecondary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                InputField(
+                                    value = fieldValues[field.key].orEmpty(),
+                                    onValueChange = { fieldValues[field.key] = it },
+                                    placeholder = field.label,
+                                    isPassword = field.type == "password",
+                                    keyboardType = if (field.type == "password") KeyboardType.Password else KeyboardType.Text,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Surface(
+                        onClick = onDismiss,
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = NuvioColors.Surface,
+                            focusedContainerColor = NuvioColors.FocusBackground
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                                shape = RoundedCornerShape(50)
+                            )
+                        ),
+                        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(50))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = NuvioColors.TextPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Cancel", color = NuvioColors.TextPrimary)
+                        }
+                    }
+
+                    Surface(
+                        onClick = { onSave(fieldValues.toMap()) },
+                        modifier = Modifier.focusRequester(focusRequester),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = NuvioColors.Secondary,
+                            focusedContainerColor = NuvioColors.SecondaryVariant
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                                shape = RoundedCornerShape(50)
+                            )
+                        ),
+                        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(50))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = NuvioColors.OnSecondary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Save", color = NuvioColors.OnSecondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 @Composable
 private fun RepositoryCard(
     repository: PluginRepository,
     repoScrapers: List<ScraperInfo>,
     onRefresh: () -> Unit,
     onRemove: () -> Unit,
+    onConfigure: () -> Unit,
     onToggleAll: (Boolean) -> Unit,
     isLoading: Boolean,
     isReadOnly: Boolean = false
@@ -1062,7 +1240,8 @@ private fun RepositoryCard(
     var isToggleFocused by remember { mutableStateOf(false) }
     var isRefreshFocused by remember { mutableStateOf(false) }
     var isRemoveFocused by remember { mutableStateOf(false) }
-    val isCardFocused = isToggleFocused || isRefreshFocused || isRemoveFocused
+    var isConfigureFocused by remember { mutableStateOf(false) }
+    val isCardFocused = isToggleFocused || isRefreshFocused || isRemoveFocused || isConfigureFocused
     val cardBorderColor by animateColorAsState(
         targetValue = if (isCardFocused) NuvioColors.FocusRing else Color.Transparent,
         label = "repositoryCardBorder"
@@ -1155,6 +1334,26 @@ private fun RepositoryCard(
                                 )
                             )
                         }
+                    }
+                }
+
+                if (repository.settings.isNotEmpty()) {
+                    Button(
+                        onClick = onConfigure,
+                        enabled = !isLoading,
+                        modifier = Modifier.onFocusChanged { isConfigureFocused = it.isFocused },
+                        colors = ButtonDefaults.colors(
+                            containerColor = NuvioColors.Surface,
+                            contentColor = NuvioColors.TextSecondary,
+                            focusedContainerColor = NuvioColors.FocusBackground,
+                            focusedContentColor = NuvioColors.Secondary
+                        ),
+                        shape = ButtonDefaults.shape(RoundedCornerShape(12.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Configure"
+                        )
                     }
                 }
 

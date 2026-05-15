@@ -396,6 +396,7 @@ class PluginManager @Inject constructor(
             enabled = true,
             lastUpdated = System.currentTimeMillis(),
             scraperCount = manifest.scrapers.size,
+            settings = manifest.settings,
             type = RepositoryType.NUVIO_JS
         )
 
@@ -564,6 +565,7 @@ class PluginManager @Inject constructor(
             val updatedRepo = repo.copy(
                 name = manifest.name,
                 lastUpdated = System.currentTimeMillis(),
+                settings = manifest.settings,
                 scraperCount = manifest.scrapers.size
             )
             dataStore.updateRepository(updatedRepo)
