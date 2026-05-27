@@ -195,8 +195,8 @@ fun ThemeSettingsContent(
                     )
                 }
                 SettingsToggleRow(
-                    title = R.string.appearance_stream_display_mode,
-                    subtitle = R.string.appearance_stream_display_mode_subtitle,
+                    title = stringResource(R.string.appearance_stream_display_mode),
+                    subtitle = stringResource(R.string.appearance_stream_display_mode_subtitle),
                     checked = polishedEnabled,
                     onToggle = {
                         polishedEnabled = !polishedEnabled
