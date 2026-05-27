@@ -65,7 +65,8 @@ import com.nuvio.tv.ui.theme.ThemeColors
 import com.nuvio.tv.ui.theme.getFontFamily
 import kotlinx.coroutines.delay
 import java.util.Locale
-
+import com.nuvio.tv.ui.screens.stream.TvDisplayMode          // adatta il package
+import com.nuvio.tv.ui.screens.stream.TvStreamsAppearanceStorage  // adatta il package
 @Composable
 fun ThemeSettingsScreen(
     viewModel: ThemeSettingsViewModel = hiltViewModel(),
