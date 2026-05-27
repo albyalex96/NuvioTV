@@ -2331,4 +2331,7 @@
   <string name="collections_delete_confirm_subtitle">Questo eliminerà permanentemente \"%1$s\". L\'azione è irreversibile.</string>
   <string name="collections_editor_delete_folder_title">Eliminare la cartella?</string>
   <string name="collections_editor_delete_folder_subtitle">Questo eliminerà permanentemente \"%1$s\" e tutto il suo contenuto.</string>
+  <!-- Stream Parser -->
+    <string name="appearance_stream_display_mode">Visualizzazione Pulita</string>
+    <string name="appearance_stream_display_mode_subtitle">Mostra info stream con badge puliti invece di testo grezzo</string>
 </resources>

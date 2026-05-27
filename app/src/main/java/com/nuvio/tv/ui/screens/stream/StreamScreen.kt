@@ -997,9 +997,14 @@ private fun StreamCard(
     stream: Stream,
     onClick: () -> Unit,
     focusRequester: FocusRequester? = null,
-    onUpKey: (() -> Unit)? = null
+    onUpKey: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+
+    val displayMode = remember {
+        TvStreamsAppearanceStorage.loadDisplayMode(context)
+    }
+
     val streamName = remember(stream) { stream.getDisplayName() }
     val streamDescription = remember(stream) { stream.getDisplayDescription() }
     val addonLogoModel = remember(context, stream.addonLogo) {
@@ -1023,43 +1028,50 @@ private fun StreamCard(
             } else Modifier),
         colors = CardDefaults.colors(
             containerColor = NuvioColors.BackgroundElevated,
-            focusedContainerColor = NuvioColors.BackgroundElevated
+            focusedContainerColor = NuvioColors.BackgroundElevated,
         ),
         shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        scale = CardDefaults.scale(focusedScale = 1.08f)
+        scale = CardDefaults.scale(focusedScale = 1.08f),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = streamName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = NuvioColors.TextPrimary
+            if (displayMode == TvDisplayMode.POLISHED) {
+                TvPolishedStreamCardContent(
+                    stream = stream,
+                    streamName = streamName,
+                    streamDescription = streamDescription,
+                    modifier = Modifier.weight(1f),
                 )
-
-                streamDescription?.let { description ->
-                    if (description != streamName) {
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = NuvioTheme.extendedColors.textSecondary
-                        )
+            } else {
+                // Layout originale
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = streamName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = NuvioColors.TextPrimary,
+                    )
+                    streamDescription?.let { description ->
+                        if (description != streamName) {
+                            Text(
+                                text = description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = NuvioTheme.extendedColors.textSecondary,
+                            )
+                        }
                     }
                 }
-
             }
 
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
+            // Logo + addon name (invariato in entrambe le modalità)
+            Column(horizontalAlignment = Alignment.End) {
                 if (addonLogoModel != null) {
                     AsyncImage(
                         model = addonLogoModel,
@@ -1067,21 +1079,338 @@ private fun StreamCard(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(RoundedCornerShape(4.dp)),
-                        contentScale = ContentScale.Fit
+                        contentScale = ContentScale.Fit,
                     )
                 }
-
                 Spacer(modifier = Modifier.height(4.dp))
-
                 Text(
                     text = stream.addonName,
                     style = MaterialTheme.typography.labelSmall,
                     color = NuvioTheme.extendedColors.textTertiary,
-                    maxLines = 1
+                    maxLines = 1,
                 )
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Polished layout TV
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun TvPolishedStreamCardContent(
+    stream: Stream,
+    streamName: String,
+    streamDescription: String?,
+    modifier: Modifier = Modifier,
+) {
+    val badges = remember(streamName, streamDescription) {
+        buildTvParsedBadges(streamName, streamDescription)
+    }
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Riga 1: badge qualità + nome + cached
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            TvQualityBadge(badge = badges.quality)
+            Text(
+                text = streamName,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                ),
+                color = NuvioColors.TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (badges.isCached) {
+                TvCachedBadge()
+            }
+        }
+
+        // Riga 2: HDR + Audio + Codec
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            badges.hdr?.let { TvSmallBadgeChip(badge = it) }
+            TvSmallBadgeChip(badge = badges.audio)
+            badges.codec?.let { TvSmallBadgeChip(badge = it) }
+        }
+
+        // Riga 3: dimensione + lingua
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            badges.size?.let { badge ->
+                Icon(
+                    imageVector = Icons.Rounded.Storage,
+                    contentDescription = null,
+                    tint = NuvioTheme.extendedColors.textSecondary,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text = badge.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NuvioTheme.extendedColors.textSecondary,
+                )
+            }
+            badges.language?.let { lang ->
+                Text(
+                    text = lang,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NuvioTheme.extendedColors.textSecondary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvQualityBadge(badge: TvStreamBadgeData) {
+    val gradientColors = when (badge.label) {
+        "4K"    -> listOf(Color(0xFFB8860B), Color(0xFFFFD700))
+        "1080p" -> listOf(Color(0xFF1565C0), Color(0xFF0288D1))
+        "720p"  -> listOf(Color(0xFF2E7D32), Color(0xFF00897B))
+        else    -> listOf(Color(0xFFB71C1C), Color(0xFFC62828))
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "tv_quality_sweep")
+    val sweepOffset by infiniteTransition.animateFloat(
+        initialValue = -0.4f,
+        targetValue = 1.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "tv_sweep_offset",
+    )
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(brush = Brush.horizontalGradient(colors = gradientColors))
+            .drawWithContent {
+                drawContent()
+                val w = size.width
+                val h = size.height
+                val sweepX = sweepOffset * (w * 1.8f) - w * 0.4f
+                val halfWidth = w * 0.45f
+                val skew = h * 0.58f
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(sweepX - halfWidth + skew, 0f)
+                    lineTo(sweepX + halfWidth + skew, 0f)
+                    lineTo(sweepX + halfWidth - skew, h)
+                    lineTo(sweepX - halfWidth - skew, h)
+                    close()
+                }
+                drawPath(
+                    path = path,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.18f),
+                            Color.White.copy(alpha = 0.32f),
+                            Color.White.copy(alpha = 0.32f),
+                            Color.White.copy(alpha = 0.18f),
+                            Color.Transparent,
+                        ),
+                        startX = sweepX - halfWidth,
+                        endX = sweepX + halfWidth,
+                    ),
+                )
+            }
+            .padding(horizontal = 12.dp, vertical = 6.dp),  // leggermente più grande per la TV
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = badge.label,
+            style = MaterialTheme.typography.labelLarge.copy(  // labelLarge per la TV
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.sp,
+            ),
+            color = Color.White,
+        )
+    }
+}
+
+@Composable
+private fun TvCachedBadge() {
+    val infiniteTransition = rememberInfiniteTransition(label = "tv_cached_pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 750, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "tv_cached_alpha",
+    )
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF1A6B2F).copy(alpha = alpha))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Bolt,
+                contentDescription = null,
+                tint = Color(0xFF4ADE80),
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = "Cached",
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                ),
+                color = Color(0xFF4ADE80),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvSmallBadgeChip(badge: TvStreamBadgeData) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(badge.color)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            badge.icon?.let { icon ->
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+            Text(
+                text = badge.label,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = Color.White,
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Badge data e parser
+// ---------------------------------------------------------------------------
+
+private data class TvStreamBadgeData(
+    val label: String,
+    val color: Color,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+)
+
+private data class TvParsedStreamBadges(
+    val quality: TvStreamBadgeData,
+    val hdr: TvStreamBadgeData?,
+    val audio: TvStreamBadgeData,
+    val codec: TvStreamBadgeData?,
+    val size: TvStreamBadgeData?,
+    val language: String?,
+    val isCached: Boolean,
+)
+
+private fun buildTvParsedBadges(
+    name: String,
+    description: String?,
+): TvParsedStreamBadges {
+    val combined = "$name ${description.orEmpty()}"
+
+    val quality = when {
+        Regex("\\b(4K|2160p|UHD)\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("4K", Color(0xFFB8860B))
+        Regex("\\b(1080p|FHD)\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("1080p", Color(0xFF1565C0))
+        Regex("\\b720p\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("720p", Color(0xFF2E7D32))
+        else ->
+            TvStreamBadgeData("SD", Color(0xFFB71C1C))
+    }
+
+    val hdr = when {
+        Regex("\\bDolby[ .]Vision\\b|\\bDV\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("DV", Color(0xFF1565C0), Icons.Rounded.AutoAwesome)
+        Regex("\\bHDR10\\+", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("HDR10+", Color(0xFFB7950B))
+        Regex("\\bHDR\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("HDR", Color(0xFF9C6A00))
+        else -> null
+    }
+
+    val audio = when {
+        Regex("\\bAtmos\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("Atmos", Color(0xFF0277BD), Icons.Rounded.VolumeUp)
+        Regex("\\bDTS[-: ]?X\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("DTS:X", Color(0xFF6A1B9A), Icons.Rounded.VolumeUp)
+        Regex("\\bDTS\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("DTS", Color(0xFF4A148C), Icons.Rounded.VolumeUp)
+        Regex("\\bEAC3\\b|\\bDD\\+|\\bDolby Digital\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("DD+", Color(0xFF1565C0), Icons.Rounded.VolumeUp)
+        Regex("\\bAC3\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("AC3", Color(0xFF0D47A1), Icons.Rounded.VolumeUp)
+        Regex("\\bAAC\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("AAC", Color(0xFF37474F), Icons.Rounded.VolumeUp)
+        else ->
+            TvStreamBadgeData("Stereo", Color(0xFF424242), Icons.Rounded.VolumeUp)
+    }
+
+    val codec = when {
+        Regex("\\bHEVC\\b|\\bx265\\b|\\bH\\.265\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("HEVC", Color(0xFF546E7A))
+        Regex("\\bAVC\\b|\\bx264\\b|\\bH\\.264\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("AVC", Color(0xFF455A64))
+        Regex("\\bAV1\\b", RegexOption.IGNORE_CASE).containsMatchIn(combined) ->
+            TvStreamBadgeData("AV1", Color(0xFF004D40))
+        else -> null
+    }
+
+    // Dimensione — cerca pattern tipo "2.1 GB" o "850 MB" nel testo
+    val size = Regex("(\\d+\\.?\\d*)\\s*(GB|MB)", RegexOption.IGNORE_CASE)
+        .find(combined)
+        ?.let { TvStreamBadgeData("${it.groupValues[1]} ${it.groupValues[2].uppercase()}", Color(0xFF424242)) }
+
+    val language = Regex(
+        "\\b(English|Italian|French|Spanish|German|Japanese|Korean|Portuguese|Chinese|Arabic|Hindi|Russian)\\b",
+        RegexOption.IGNORE_CASE,
+    ).find(combined)?.value
+
+    val isCached = Regex(
+        "\\b(cached|instant|RD\\+|AD\\+|debrid)\\b|⚡",
+        RegexOption.IGNORE_CASE,
+    ).containsMatchIn(combined)
+
+    return TvParsedStreamBadges(
+        quality = quality,
+        hdr = hdr,
+        audio = audio,
+        codec = codec,
+        size = size,
+        language = language,
+        isCached = isCached,
+    )
 }
 
 @Composable

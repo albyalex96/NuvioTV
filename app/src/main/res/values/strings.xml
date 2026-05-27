@@ -2476,5 +2476,9 @@
     <string name="trakt_related_error_request_failed">Trakt related request failed</string>
     <string name="trakt_comments_error_request_failed">Trakt comments request failed</string>
     <string name="trakt_library_error_fetch_list_items">Failed to fetch list items</string>
+    
+    <!-- Stream Parser -->
+    <string name="appearance_stream_display_mode">Stream Display Mode</string>
+    <string name="appearance_stream_display_mode_subtitle">Show stream info as badges instead of raw text</string>
 
 </resources>

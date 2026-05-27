@@ -187,6 +187,24 @@ fun ThemeSettingsContent(
                         }
                     )
                 }
+
+                var polishedEnabled by remember {
+                    mutableStateOf(
+                        TvStreamsAppearanceStorage.loadDisplayMode(context) == TvDisplayMode.POLISHED
+                    )
+                }
+                SettingsToggleRow(
+                    title = R.string.appearance_stream_display_mode,
+                    subtitle = R.string.appearance_stream_display_mode_subtitle,
+                    checked = polishedEnabled,
+                    onToggle = {
+                        polishedEnabled = !polishedEnabled
+                        TvStreamsAppearanceStorage.saveDisplayMode(
+                            context,
+                            if (polishedEnabled) TvDisplayMode.POLISHED else TvDisplayMode.ORIGINAL,
+                        )
+                    }
+    )
             }
 
             SettingsGroupCard(
