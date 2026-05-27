@@ -974,9 +974,8 @@
     <string name="debrid_stream_codec_any">Cualquier códec</string>
     <string name="debrid_stream_codec_h264">H.264 / AVC</string>
     <string name="debrid_stream_codec_hevc">HEVC / H.265</string>
-    <string name="debrid_stream_codec_av1">AV1</string>    <string name="debrid_formatter_title">Editor web</string>
-
-        <!-- Debrid stream filter dialogs (per-resolution / quality / size / multi-choice pickers) -->
+    <string name="debrid_stream_codec_av1">AV1</string>
+    <!-- Debrid stream filter dialogs (per-resolution / quality / size / multi-choice pickers) -->
     <string name="debrid_stream_per_resolution_limit_title">Límite por resolución</string>
     <string name="debrid_stream_per_resolution_limit_subtitle">Limita resultados repetidos de 2160p, 1080p y 720p después del ordenamiento.</string>
     <string name="debrid_stream_per_quality_limit_title">Límite por calidad</string>
