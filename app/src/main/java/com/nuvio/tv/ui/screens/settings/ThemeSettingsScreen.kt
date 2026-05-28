@@ -65,7 +65,8 @@ import com.nuvio.tv.ui.theme.ThemeColors
 import com.nuvio.tv.ui.theme.getFontFamily
 import kotlinx.coroutines.delay
 import java.util.Locale
-
+import com.nuvio.tv.ui.screens.stream.TvDisplayMode          // adatta il package
+import com.nuvio.tv.ui.screens.stream.TvStreamsAppearanceStorage  // adatta il package
 @Composable
 fun ThemeSettingsScreen(
     viewModel: ThemeSettingsViewModel = hiltViewModel(),
@@ -187,6 +188,24 @@ fun ThemeSettingsContent(
                         }
                     )
                 }
+
+                var polishedEnabled by remember {
+                    mutableStateOf(
+                        TvStreamsAppearanceStorage.loadDisplayMode(context) == TvDisplayMode.POLISHED
+                    )
+                }
+                SettingsToggleRow(
+                    title = stringResource(R.string.appearance_stream_display_mode),
+                    subtitle = stringResource(R.string.appearance_stream_display_mode_subtitle),
+                    checked = polishedEnabled,
+                    onToggle = {
+                        polishedEnabled = !polishedEnabled
+                        TvStreamsAppearanceStorage.saveDisplayMode(
+                            context,
+                            if (polishedEnabled) TvDisplayMode.POLISHED else TvDisplayMode.ORIGINAL,
+                        )
+                    }
+    )
             }
 
             SettingsGroupCard(
