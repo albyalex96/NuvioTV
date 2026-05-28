@@ -103,21 +103,19 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.drawscope.drawContent
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -1202,7 +1200,7 @@ private fun TvQualityBadge(badge: TvStreamBadgeData) {
     val sweepOffset by infiniteTransition.animateFloat(
         initialValue = -0.4f,
         targetValue = 1.4f,
-        animationSpec = infiniteRepeatable(
+        animationSpec = infiniteRepeatable<Float>(
             animation = tween(durationMillis = 3500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
@@ -1263,7 +1261,7 @@ private fun TvCachedBadge() {
     val alpha by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 0.4f,
-        animationSpec = infiniteRepeatable(
+        animationSpec = infiniteRepeatable<Float>(
             animation = tween(durationMillis = 750, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),

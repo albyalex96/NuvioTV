@@ -66,18 +66,19 @@ import kotlinx.coroutines.flow.map
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.drawscope.drawContent
+
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.material.icons.Icons
+
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.VolumeUp
+
 
 internal enum class SettingsCategory {
     EXPERIENCE,
