@@ -3,7 +3,7 @@ name: Build Release APK
 on:
   push:
     branches:
-      - "app/enhanced"
+      - app/enhanced
   workflow_dispatch:
     inputs:
       target_branch:
