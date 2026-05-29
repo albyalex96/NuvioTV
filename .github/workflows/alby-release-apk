@@ -1,0 +1,157 @@
+name: Build Release APK 
+
+on:
+  push:
+    branches:
+      - "app/enhanced"
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Branch da compilare (lascia vuoto per app/enhanced)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-debug:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Determiniamo dinamicamente il branch da usare con il default richiesto
+      - name: Resolve target branch
+        id: resolve_branch
+        run: |
+          INPUT_BRANCH="${{ github.event.inputs.target_branch }}"
+          if [ -z "$INPUT_BRANCH" ]; then
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              CHOSEN_BRANCH="app/enhanced"
+            else
+              CHOSEN_BRANCH="app/enhanced"
+            fi
+          else
+            CHOSEN_BRANCH="$INPUT_BRANCH"
+          fi
+          echo "branch=$CHOSEN_BRANCH" >> $GITHUB_OUTPUT
+          echo "Selected branch: $CHOSEN_BRANCH"
+
+      # 2. Checkout usando il branch dinamico
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve_branch.outputs.branch }}
+          fetch-depth: 0        # Necessario per generare correttamente il changelog dai commit
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # 3. AUTO GENERAZIONE DEL KEYSTORE (Sincronizzato perfettamente con il build.gradle.kts)
+      - name: Generate self-signed keystore
+        run: |
+          # Creiamo la cartella di lavoro esatta se non esiste
+          mkdir -p /home/runner/work/NuvioTV/NuvioTV
+          
+          # Generiamo il file con il nome corretto richiesto dal log di errore
+          keytool -genkeypair \
+            -alias "nuviotv" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 365 \
+            -keystore "/home/runner/work/NuvioTV/NuvioTV/nuvio-release.keystore" \
+            -storepass "815787" \
+            -keypass "815787" \
+            -dname "CN=Nuvio TV CI, OU=CI, O=Nuvio, L=Unknown, ST=Unknown, C=US"
+          
+          echo "Keystore finto generato nel path richiesto dal Gradle."
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Write local.properties
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          printf 'TV_LOGIN_REDIRECT_BASE_URL=%s\n' "https://nuvioapp.space/tv-login" >> local.properties
+          printf 'ADDON_REMOTE_BASE_URL=%s\n' "" >> local.properties
+          printf 'AVATAR_PUBLIC_BASE_URL=%s\n' "https://dpyhjjcoabcglfmgecug.supabase.co/storage/v1/object/public/avatars" >> local.properties
+          printf 'ENABLE_REMOTE_WRAPPER_MODE=%s\n' "false" >> local.properties
+          printf 'IMDB_RATINGS_API_BASE_URL=%s\n' "https://seriesgraph.com/" >> local.properties
+          printf 'INTRODB_API_URL=%s\n' "https://api.introdb.app/" >> local.properties
+          printf 'PARENTAL_GUIDE_API_URL=%s\n' "https://api.imdbapi.dev/" >> local.properties
+          printf 'YOUTUBE_PROXY_UR=%s\n' "https://nuviomedia.github.io/NuvioWeb/youtube-proxy.html" >> local.properties
+          printf 'TV_LOGIN_WEB_BASE_URL=%s\n' "https://nuvioapp.space/tv-login" >> local.properties
+          printf 'WEBOS_SERVICE_ID=%s\n' "space.nuvio.webos.service" >> local.properties
+          printf 'TMDB_API_KEY=%s\n' "439c478a771f35c05022f9feabcca01c" >> local.properties
+          printf 'SUPABASE_ANON_KEY=%s\n' "$SUPABASE_ANON_KEY" >> local.properties
+          printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL" >> local.properties
+          printf 'NUVIO_RELEASE_STORE_FILE=/home/runner/work/NuvioTV/NuvioTV/nuvio-release.keystore\n' >> local.properties
+          printf 'NUVIO_RELEASE_STORE_PASSWORD=815787\n' >> local.properties
+          printf 'NUVIO_RELEASE_KEY_ALIAS=nuviotv\n' >> local.properties
+          printf 'NUVIO_RELEASE_KEY_PASSWORD=815787\n' >> local.properties
+
+      # 4. Generazione del Changelog basato sui commit dall'ultima release
+      - name: Generate Changelog
+        id: changelog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREV_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Release precedente trovata: $PREV_TAG"
+            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "Nessuna release precedente, prendo gli ultimi 20 commit"
+            COMMITS=$(git log HEAD --pretty=format:"- %s (%h)" --no-merges -n 20)
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            COMMITS="- Nessuna modifica rilevata rispetto alla release precedente"
+          fi
+
+          {
+            echo "## 📦 Nuvio Build #${{ github.run_number }}"
+            echo ""
+            echo "**Branch target:** \`${{ steps.resolve_branch.outputs.branch }}\`"
+            if [ -n "$PREV_TAG" ]; then
+              echo "**Version Precedente:** \`$PREV_TAG\`"
+            fi
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 🔨 Applied Patches"
+            echo ""
+            echo "$COMMITS"
+          } > release_body.md
+
+      # 5. Esecuzione della Build Gradle
+      - name: Build with Gradle
+        run: ./gradlew :app:assembleFullRelease
+
+      - name: Archivia APK generato
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-full-armeabi-v7a-debug
+          path: app/build/outputs/apk/full/**/*.apk
+          retention-days: 7
+          
+      # 8. Creazione della GitHub Release e pubblicazione dell'APK
+      - name: Create GitHub Release and Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v1.0.${{ github.run_number }}-debug"
+          name: "Nuvio Auto-Dev Build #${{ github.run_number }}"
+          body_path: release_body.md
+          draft: false
+          prerelease: true
+          target_commitish: ${{ steps.resolve_branch.outputs.branch }}
+          files: app/build/outputs/apk/full/**/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
